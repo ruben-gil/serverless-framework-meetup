@@ -251,7 +251,7 @@ provider:
   region: ${opt:region, self:custom.config.region-default}
   stage: ${opt:stage, self:custom.config.stage-default}
   environment:
-    TABLE: ${self:service}_${self:provider.stage}_Table
+    DYNAMODB_TASKS_TABLE: ${self:service}_${self:provider.stage}_Table
     STAGE: ${self:provider.stage}
 ```
 Donde:
@@ -314,7 +314,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.TABLE}
+        TableName: ${self:provider.environment.DYNAMODB_TASKS_TABLE}
 ```
 
 
@@ -344,7 +344,7 @@ provider:
 
 ```
 import users
-@patch.dict(os.environ, {'STAGE':'local','TABLE':'serverless-meetup_local_Table'}, clear=True)
+@patch.dict(os.environ, {'STAGE':'local','DYNAMODB_TASKS_TABLE':'serverless-meetup_local_Table'}, clear=True)
 @patch('users.boto3')
 def test_list(self, boto3):
     
