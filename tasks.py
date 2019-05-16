@@ -7,15 +7,13 @@ import boto3
 
 
 def get_table(environ):
-
     if environ == 'local':
         return boto3.resource('dynamodb', endpoint_url='http://localhost:4569')
 
     return boto3.resource('dynamodb')
-        
+
 
 def create_task(event, context):
-
     dynamodb = get_table(os.environ['STAGE'])
     table = dynamodb.Table(os.environ['DYNAMODB_TASKS_TABLE'])
 
@@ -32,7 +30,7 @@ def create_task(event, context):
 
     # write the task to the database
     table.put_item(
-        Item = item
+        Item=item
     )
 
     # create a response
@@ -44,7 +42,6 @@ def create_task(event, context):
 
 
 def get_task(event, context):
-
     dynamodb = get_table(os.environ['STAGE'])
     table = dynamodb.Table(os.environ['DYNAMODB_TASKS_TABLE'])
 
@@ -65,7 +62,6 @@ def get_task(event, context):
 
 
 def list_tasks(event, context):
-
     dynamodb = get_table(os.environ['STAGE'])
     table = dynamodb.Table(os.environ['DYNAMODB_TASKS_TABLE'])
 
@@ -82,7 +78,6 @@ def list_tasks(event, context):
 
 
 def update_task(event, context):
-
     dynamodb = get_table(os.environ['STAGE'])
     table = dynamodb.Table(os.environ['DYNAMODB_TASKS_TABLE'])
 
@@ -94,19 +89,19 @@ def update_task(event, context):
 
     # update the task in the database
     result = table.update_item(
-        Key = {
+        Key={
             'id': event['pathParameters']['id']
         },
-        ExpressionAttributeNames = {
-          '#task_text': 'text',
+        ExpressionAttributeNames={
+            '#task_text': 'text',
         },
-        ExpressionAttributeValues = {
-          ':text': data['text'],
-          ':checked': data['checked']
+        ExpressionAttributeValues={
+            ':text': data['text'],
+            ':checked': data['checked']
         },
-        UpdateExpression = 'SET #task_text = :text, '
-                           'checked = :checked, ',
-        ReturnValues = 'ALL_NEW',
+        UpdateExpression='SET #task_text = :text, '
+                         'checked = :checked, ',
+        ReturnValues='ALL_NEW',
     )
 
     # create a response
@@ -119,13 +114,12 @@ def update_task(event, context):
 
 
 def delete_task(event, context):
-
     dynamodb = get_table(os.environ['STAGE'])
     table = dynamodb.Table(os.environ['DYNAMODB_TASKS_TABLE'])
 
     # delete the task from the database
     table.delete_item(
-        Key = {
+        Key={
             'id': event['pathParameters']['id']
         }
     )
