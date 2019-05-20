@@ -25,7 +25,7 @@ provider:
   region: ${opt:region, self:custom.config.region-default}
   stage: ${opt:stage, self:custom.config.stage-default}
   environment:
-    TABLE: ${self:service}_${self:provider.stage}_Table
+    DYNAMODB_TASKS_TABLE: ${self:service}_${self:provider.stage}_Table
     STAGE: ${self:provider.stage}
 
   iamRoleStatements:
@@ -168,7 +168,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-        TableName: ${self:provider.environment.TABLE}
+        TableName: ${self:provider.environment.DYNAMODB_TASKS_TABLE}
 # you can add CloudFormation resource templates here
 #resources:
 #  Resources:
