@@ -7,10 +7,6 @@ from tasks import *
 @patch.dict(os.environ, {'STAGE': 'local', 'DYNAMODB_TASKS_TABLE': 'serverless-meetup_local_Table'}, clear=True)
 @patch('tasks.boto3')
 class TestMethods(unittest.TestCase):
-    def test_get_table(self):
-        environ = 'local'
-        result = get_table(environ)
-        self.assertEqual(result['statusCode'], 200)
 
     def test_create(self, boto3):
         event = {"body": "{ \"text\": \"hola\" }"}

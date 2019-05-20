@@ -7,6 +7,15 @@ Serverless es un tipo de arquitectura donde las máquinas dejan de existir y el 
 
 Serverless Framework nos simplifica el desarrollo, orquestación y despliegue de los distintos elementos que conforman estas arquitecturas.
 
+## Roadmap
+El objetivo es entender cómo funciona serverless framework y cómo nos facilita el desarrollo, testing y despliegue de nuestras arquitecturas serverless.
+
+Este README es una guía paso a paso con la que vamos a generar un proyecto, realizar desarrollos en local y desplegarlo utilizando técnicas avanazadas de despliegue como canary deployment.
+
+En este repositorio podrás encontrar 4 archivos de python (.py) que implementan la lógica de negocio que vamos a desplegar y exponer mediante un api.
+
+La práctica solucionada puedes encontrarla en la rama [**solved**](https://gitlab.com/ruben-gil/serverless-framework-meetup/tree/solved)
+
 
 ## Requisitos
 
@@ -123,14 +132,14 @@ Podemos crear un CRUD de usuarios añadiendo funciones en serverless.yml
 Por ejemplo:
 ```
   get:
-    handler: tasks.get_task
+    handler: handler.hello
     events:
       - http:
           path: tasks/{id}
           method: get
 
   create:
-    handler: tasks.create_task
+    handler: handler.hello
     events:
       - http:
           path: tasks
@@ -268,7 +277,7 @@ Y para poder acceder a las propiedades del fichero
   ${self:custom.config.file:subnetId1}
 
 ## LocalStack
-LocalStack es un proyecto open-source que permite simular los servicios de aws en local arrancando en contenedores docker.
+LocalStack es un proyecto open-source que permite simular los servicios de aws en local arrancando en contenedores docker. Si bien no es necesario para esta práctica ya que serverless framework tiene otros plugins para la simulación de tablas de DynamoDB en local, considero que es una herramienta muy potente y sencilla de uttilizar ya que únicamente hay que clonarse un repositorio y ejecutar un docker-compose.
 
 ![Localstack](images/localstack.png)
 
@@ -279,14 +288,15 @@ git clone https://github.com/localstack/localstack.git
 cd localstack
 docker-compose up
 ```
+Veremos cómo va levantando cada uno de los servicios de AWS que pueden ser atacados directamente con nuestro AWS cli.
 
 ### Creación de recursos
 
-Se puede usar el aws cli para crear los recursos correspondientes en localstack.
+Se puede usar el AWS cli para crear los recursos correspondientes en localstack.
 
 [AWS cli with Localstack cheatsheet](https://lobster1234.github.io/2017/04/05/working-with-localstack-command-line/)
 
-Crear Base de datos local
+Vamos a crear la tabla de dynamoDB que necesitamos para esta práctica
 ```
 aws --endpoint-url=http://localhost:4569 dynamodb create-table --table-name serverless-meetup_local_Table  --attribute-definitions AttributeName=id,AttributeType=S --key-schema AttributeName=id,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1
 ```
@@ -297,10 +307,11 @@ En serverless.yml se pueden añadir recursos de AWS para su creación como parte
 
 ### Dynamodb
 
+Este recurso es el equivalente al que ya hemos creado en localstack
 ```
 resources:
   Resources:
-    Table:
+    ServerlessDynamoDBTable:
       Type: 'AWS::DynamoDB::Table'
       Properties:
         AttributeDefinitions:
@@ -336,22 +347,28 @@ provider:
       Resource: 
         - { "Fn::GetAtt": ["ServerlessDynamoDBTable", "Arn" ] }
 ```
-
+#### NOTA DE INTERES
+En la sección anterior podemos ver cómo utilizamos funciones de cloudformation en el serverless.yml. Aquí vemos cómo se usa.
+```
+  "Fn::GetAtt": ["ServerlessDynamoDBTable", "Arn" ]
+```
+Esta funcion busca el recurso *ServerlessDynamoDBTable* que hemos añadido en la seccion Resources y recupera su ARN (Amazon Resource Name), dato necesario para poder darle permisos a las lambdas.
 
 
 ## Testing unitario
 
 
 ```
-import users
-@patch.dict(os.environ, {'STAGE':'local','DYNAMODB_TASKS_TABLE':'serverless-meetup_local_Table'}, clear=True)
-@patch('users.boto3')
-def test_list(self, boto3):
-    
-    boto3.resource.return_value.Table.return_value.scan.return_value = {'Items':[]}
-    
-    result=listUser({},{})
-    self.assertEqual(result['statusCode'], 200)
+import tasks
+@patch.dict(os.environ, {'STAGE': 'local', 'DYNAMODB_TASKS_TABLE': 'serverless-meetup_local_Table'}, clear=True)
+@patch('tasks.boto3')
+class TestMethods(unittest.TestCase):
+  def test_get(self, boto3):
+      boto3.resource.return_value.Table.return_value.get_item.return_value = {
+          'Item': {'id': '2cc2b7e6-3953-11e9-abe6-2816ad91e759'}}
+      event = {'pathParameters': {'id': '2cc2b7e6-3953-11e9-abe6-2816ad91e759'}}
+      result = get_task(event, {})
+      self.assertEqual(result['statusCode'], 200)
 ```
 
 ### Cobertura de código
@@ -391,7 +408,7 @@ Lo que conseguiremos con esto es que se despliegue una versión canary y que cad
 
 #### Rollback
 
-El canary deployment anterior es muy útil, sin embargo, tal y como está, está falto de lógica ya que en caso de fallo la instancia canary seguiría recibiendo tráfico.
+El canary deployment anterior es muy útil, sin embargo, tal y como está, le falta algo de lógica ya que en caso de fallo la instancia canary seguiría recibiendo tráfico.
 
 Para poder hacer un seguimiento del comportamiento de la lambda canary y conseguir hacer un rollback vamos a instalar un nuevo plugin que nos facilitará la creación de alertas para monitorizar los errores.
 
@@ -420,7 +437,7 @@ alarms:
     comparisonOperator: GreaterThanOrEqualToThreshold
 ```
 
-Podemos añadir las alarmas que consideremos al deployment. Cuando alguna de ella se dispare todo el tráfico se volvera a migrar a la versión anterior y el despliegue hará un rollback.
+Podemos añadir las alarmas que consideremos al deployment. Cuando alguna de ella se dispare todo el tráfico se volvera a migrar a la versión anterior y el despliegue hará un rollback sin tener downtime.
 
 ```
 deploymentSettings:
@@ -430,7 +447,7 @@ deploymentSettings:
     - HelloErrorAlarm
 ```
 
-El nombre de la alarma siempre será la concatenacion del nombre de la funcion con el nombre de la alarma seguido del la palabra Alarm en camel case (en este caso: hello+error+Alram = HelloErrorAlarm)
+El nombre de la alarma siempre será la concatenacion del nombre de la funcion con el nombre de la alarma seguido del la palabra Alarm en camel case (en este caso: hello+error+Alarm = HelloErrorAlarm)
 
 #### Testing "end to end"
 
@@ -464,7 +481,7 @@ pipeline {
           steps {
               script {
                   '''
-                      coverage run test_users.py
+                      coverage run tasks_test.py
                       coverage report
                   '''
               }
@@ -482,11 +499,12 @@ pipeline {
 }
 ```
 
-## Conclusiones
+<!-- ## Conclusiones
+TODO -->
 
 ## Autoría
 
-* **[Ruben Gil](mailto:rgil@atsistemas.com)** - *Technical lead Solutions Architect* - 
+* **[Ruben Gil](mailto:gil.lapuente@gmail.com)** - *Technical lead Solutions Architect* - 
 
 ## Fuentes de información
 
